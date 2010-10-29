@@ -64,6 +64,7 @@
 #include <mach/vreg.h>
 /* #include <mach/pmic.h> */
 #include <mach/msm_hsusb.h>
+#include <mach/bcm_bt_lpm.h>
 
 #define SMEM_SPINLOCK_I2C      6
 #define INCREDIBLEC_MICROP_VER		0x04
@@ -1393,9 +1394,32 @@ static struct platform_device sonywvga_panel = {
 		.platform_data = &sonywvga_data,
 	},
 };
+
+static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
+        .rx_wakeup_irq = -1,
+        .inject_rx_on_wakeup = 0,
+        .exit_lpm_cb = bcm_bt_lpm_exit_lpm_locked,
+};
+
+static struct bcm_bt_lpm_platform_data bcm_bt_lpm_pdata = {
+        .gpio_wake = INCREDIBLEC_GPIO_BT_CHIP_WAKE,
+        .gpio_host_wake = INCREDIBLEC_GPIO_BT_HOST_WAKE,
+        .request_clock_off_locked = msm_hs_request_clock_off_locked,
+        .request_clock_on_locked = msm_hs_request_clock_on_locked,
+};
+
+struct platform_device bcm_bt_lpm_device = {
+        .name = "bcm_bt_lpm",
+        .id = 0,
+        .dev = {
+                .platform_data = &bcm_bt_lpm_pdata,
+        },
+};
+
 static struct platform_device *devices[] __initdata = {
 	&msm_device_uart1,
 #ifdef CONFIG_SERIAL_MSM_HS
+	&bcm_bt_lpm_device,
 	&msm_device_uart_dm1,
 #endif
 	&htc_battery_pdev,
@@ -1488,20 +1512,6 @@ static struct perflock_platform_data incrediblec_perflock_data = {
 };
 
 int incrediblec_init_mmc(int sysrev);
-
-#ifdef CONFIG_SERIAL_MSM_HS
-static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-	.rx_wakeup_irq = MSM_GPIO_TO_INT(INCREDIBLEC_GPIO_BT_HOST_WAKE),	/*Chip to Device*/
-	.inject_rx_on_wakeup = 0,
-	.cpu_lock_supported = 0,
-
-	/* for bcm */
-	.bt_wakeup_pin_supported = 1,
-	.bt_wakeup_pin = INCREDIBLEC_GPIO_BT_CHIP_WAKE,
-	.host_wakeup_pin = INCREDIBLEC_GPIO_BT_HOST_WAKE,
-
-};
-#endif
 
 static int OJ_BMA_power(void)
 {
@@ -1625,7 +1635,7 @@ static void __init incrediblec_init(void)
 
 	#ifdef CONFIG_SERIAL_MSM_HS
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
-	msm_device_uart_dm1.name = "msm_serial_hs_bcm";	/* for bcm */
+	msm_device_uart_dm1.name = "msm_serial_hs";	/* for bcm */
 	#endif
 
 	incrediblec_config_uart_gpios();
