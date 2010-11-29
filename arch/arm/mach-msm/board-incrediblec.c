@@ -610,9 +610,12 @@ static int incrediblec_atmel_ts_power(int on)
 {
 	printk(KERN_INFO "incrediblec_atmel_ts_power(%d)\n", on);
 	if (on) {
+		gpio_set_value(INCREDIBLEC_GPIO_TP_RST, 0);
+		msleep(5);
 		gpio_set_value(INCREDIBLEC_GPIO_TP_EN, 1);
-		msleep(2);
+		msleep(5);
 		gpio_set_value(INCREDIBLEC_GPIO_TP_RST, 1);
+		msleep(40);
 	} else {
 		gpio_set_value(INCREDIBLEC_GPIO_TP_EN, 0);
 		msleep(2);

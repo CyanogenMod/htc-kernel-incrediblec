@@ -286,6 +286,24 @@ mmc_blk_set_blksize(struct mmc_blk_data *md, struct mmc_card *card)
 	return 0;
 }
 
+static void remove_card(struct mmc_host *host)
+{
+	printk(KERN_INFO "%s: remove card\n",
+		mmc_hostname(host));
+
+	if (!host->card || host->card->removed) {
+		printk(KERN_INFO "%s: card already removed\n",
+			mmc_hostname(host));
+		return;
+	}
+	if (!mmc_card_present(host->card)) {
+		printk(KERN_INFO "%s: card is not present\n",
+			mmc_hostname(host));
+		return;
+	}
+	host->card->removed = 1;
+	mmc_schedule_delayed_work(&host->remove, 0);
+}
 
 static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 {
@@ -293,12 +311,20 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	struct mmc_card *card = md->queue.card;
 	struct mmc_blk_request brq;
 	int ret = 1, disable_multi = 0, card_no_ready = 0;
+	int err = 0;
+	int try_recovery = 1, do_reinit = 0, do_remove = 0;
 
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (mmc_bus_needs_resume(card->host)) {
-		mmc_resume_bus(card->host);
-		if (mmc_bus_fails_resume(card->host))
+		err = mmc_resume_bus(card->host);
+		if (err) {
+			if (mmc_card_sd(card))
+				remove_card(card->host);
+			spin_lock_irq(&md->lock);
+			__blk_end_request_all(req, -EIO);
+			spin_unlock_irq(&md->lock);
 			return 0;
+		}
 		mmc_blk_set_blksize(md, card);
 	}
 
@@ -462,8 +488,8 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 			int sleepy = mmc_card_sd(card) ? 1 : 0;
 			unsigned int msec = 0;
 			unsigned long delay = jiffies + HZ;
+			err = 0;
 			do {
-				int err;
 
 				if (sleepy && (fls(++i) > 10)) {
 					msec = (unsigned int)fls(i >> 10);
@@ -487,11 +513,16 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 					goto cmd_err;
 				}
 
-
 				if (time_after(jiffies, delay)) {
-					card_no_ready = 1;
-					printk(KERN_ERR
-						"failed to get card ready\n");
+					if (try_recovery == 1)
+						do_reinit = 1;
+					else if (mmc_card_sd(card) && (try_recovery == 2))
+						do_remove = 1;
+					try_recovery++;
+					err = 1;
+					card_no_ready++;
+					printk(KERN_ERR "%s: failed to get card ready\n",
+						mmc_hostname(card->host));
 					break;
 				}
 				/*
@@ -509,10 +540,43 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 			if (mmc_decode_status(cmd.resp))
 				goto cmd_err;
 #endif
+			if (!err)
+				card_no_ready = 0;
+		}
+recovery:
+		if (do_reinit) {
+			do_reinit = 0;
+			if (card->removed)
+				goto cmd_err;
+			printk(KERN_INFO "%s: reinit card\n",
+				mmc_hostname(card->host));
+			card->host->bus_resume_flags |= MMC_BUSRESUME_NEEDS_RESUME;
+			err = mmc_resume_bus(card->host);
+			if (!err) {
+				mmc_blk_set_blksize(md, card);
+				continue;
+			} else {
+				if (mmc_card_sd(card)) {
+					printk(KERN_INFO "mmc: reinit failed, remove card\n");
+					remove_card(card->host);
+				}
+				goto cmd_err;
+			}
+		} else if (do_remove) {
+			do_remove = 0;
+			remove_card(card->host);
+			goto cmd_err;
 		}
 
 		if (brq.cmd.error || brq.stop.error ||
 			brq.data.error || card_no_ready) {
+			if (try_recovery == 1)
+				do_reinit = 1;
+			else if (mmc_card_sd(card) && (try_recovery == 2))
+				do_remove = 1;
+			try_recovery++;
+			if (do_reinit || do_remove)
+				goto recovery;
 			if (rq_data_dir(req) == READ) {
 				/*
 				 * After an error, we redo I/O one sector at a

@@ -710,7 +710,7 @@ static ssize_t store_enable(struct device *dev, struct device_attribute *attr,
 {
 	int _enabled = simple_strtol(buf, NULL, 0);
 	printk(KERN_INFO "projector: %d\n", _enabled);
-	android_enable_function(&_projector_dev.function, _enabled);
+	android_enable_function(&_projector_dev.function, _enabled, true);
 	_projector_dev.enabled = _enabled;
 	return count;
 }

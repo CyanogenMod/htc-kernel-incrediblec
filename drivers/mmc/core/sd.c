@@ -557,6 +557,7 @@ static void mmc_sd_remove(struct mmc_host *host)
 	host->card = NULL;
 }
 
+#if 0
 /*
  * When "deferred resume" fails, run another thread to stop mmcqd.
  */
@@ -586,6 +587,7 @@ static void mmc_sd_err_with_deferred_resume(struct mmc_host *host)
 		mmc_release_host(host);
 	}
 }
+#endif
 
 /*
  * Card detection callback from host.
@@ -687,18 +689,11 @@ static int mmc_sd_resume(struct mmc_host *host)
 	err = mmc_sd_init_card(host, host->ocr, host->card);
 #endif
 	mmc_release_host(host);
-
+#if 0
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (err)
 		mmc_sd_err_with_deferred_resume(host);
-#else
-	if (err) {
-		mmc_sd_remove(host);
-
-		mmc_claim_host(host);
-		mmc_detach_bus(host);
-		mmc_release_host(host);
-	}
+#endif
 #endif
 
 	return err;

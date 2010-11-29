@@ -802,7 +802,7 @@ static int modem_set_enabled(const char *val, struct kernel_param *kp)
 			perf_unlock(&usb_perf_lock);
 	}
 	gser->disabled = !enabled;
-	android_enable_function(modem_function, enabled);
+	android_enable_function(modem_function, enabled, false);
 	return 0;
 }
 
@@ -823,7 +823,7 @@ static int serial_set_enabled(const char *val, struct kernel_param *kp)
 	if (!gser)
 		return 0;
 	gser->disabled = !enabled;
-	android_enable_function(serial_function, enabled);
+	android_enable_function(serial_function, enabled, true);
 	return 0;
 }
 

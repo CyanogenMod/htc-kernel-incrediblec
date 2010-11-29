@@ -206,14 +206,14 @@ struct kgsl_pagetable *kgsl_mmu_createpagetableobject(struct kgsl_mmu *mmu)
 	pagetable->pool = gen_pool_create(KGSL_PAGESIZE_SHIFT, -1);
 	if (pagetable->pool == NULL) {
 		KGSL_MEM_ERR("Unable to allocate virtualaddr pool.\n");
-		return NULL;
+		goto err_gen_pool_create;
 	}
 
 	if (gen_pool_add(pagetable->pool, pagetable->va_base,
 				pagetable->va_range, -1)) {
 		KGSL_MEM_ERR("gen_pool_create failed for pagetable %p\n",
 				pagetable);
-		goto done;
+		goto err_gen_pool_add;
 	}
 
 	/* allocate page table memory */
@@ -223,19 +223,26 @@ struct kgsl_pagetable *kgsl_mmu_createpagetableobject(struct kgsl_mmu *mmu)
 				      pagetable->max_entries * GSL_PTE_SIZE,
 				      &pagetable->base);
 
-	if (status == 0) {
-		/* reset page table entries
-		 * -- all pte's are marked as not dirty initially
-		 */
-		kgsl_sharedmem_set(&pagetable->base, 0, 0,
-				   pagetable->base.size);
+	if (status) {
+		KGSL_MEM_ERR("cannot alloc page tables\n");
+		goto err_kgsl_sharedmem_alloc;
 	}
+
+	/* reset page table entries
+	 * -- all pte's are marked as not dirty initially
+	 */
+	kgsl_sharedmem_set(&pagetable->base, 0, 0, pagetable->base.size);
 	pagetable->base.gpuaddr = pagetable->base.physaddr;
 
 	KGSL_MEM_VDBG("return %p\n", pagetable);
 
 	return pagetable;
-done:
+
+err_kgsl_sharedmem_alloc:
+err_gen_pool_add:
+	gen_pool_destroy(pagetable->pool);
+err_gen_pool_create:
+	kfree(pagetable);
 	return NULL;
 }
 
@@ -260,7 +267,7 @@ int kgsl_mmu_destroypagetableobject(struct kgsl_pagetable *pagetable)
 	return 0;
 }
 
-int kgsl_mmu_setpagetable(struct kgsl_device *device,
+int kgsl_mmu_setstate(struct kgsl_device *device,
 				struct kgsl_pagetable *pagetable)
 {
 	int status = 0;
@@ -277,7 +284,9 @@ int kgsl_mmu_setpagetable(struct kgsl_device *device,
 			mmu->hwpagetable = pagetable;
 
 			/* call device specific set page table */
-			status = kgsl_yamato_setpagetable(mmu->device);
+			status = kgsl_yamato_setstate(mmu->device,
+				KGSL_MMUFLAGS_TLBFLUSH |
+				KGSL_MMUFLAGS_PTUPDATE);
 		}
 	}
 
@@ -360,18 +369,24 @@ int kgsl_mmu_init(struct kgsl_device *device)
 		 */
 		flags = (KGSL_MEMFLAGS_ALIGN4K | KGSL_MEMFLAGS_CONPHYS
 			 | KGSL_MEMFLAGS_STRICTREQUEST);
-		status = kgsl_sharedmem_alloc(flags, 32, &mmu->dummyspace);
+		status = kgsl_sharedmem_alloc(flags, 64, &mmu->dummyspace);
 		if (status != 0) {
 			KGSL_MEM_ERR
 			    ("Unable to allocate dummy space memory.\n");
 			kgsl_mmu_close(device);
 			return status;
 		}
-		mmu->dummyspace.gpuaddr = mmu->dummyspace.physaddr;
 
+		kgsl_sharedmem_set(&mmu->dummyspace, 0, 0,
+				   mmu->dummyspace.size);
+		/* TRAN_ERROR needs a 32 byte (32 byte aligned) chunk of memory
+		 * to complete transactions in case of an MMU fault. Note that
+		 * we'll leave the bottom 32 bytes of the dummyspace for other
+		 * purposes (e.g. use it when dummy read cycles are needed
+		 * for other blocks */
 		kgsl_yamato_regwrite(device,
 				     REG_MH_MMU_TRAN_ERROR,
-				     mmu->dummyspace.gpuaddr);
+				     mmu->dummyspace.physaddr + 32);
 
 		mmu->defaultpagetable = kgsl_mmu_createpagetableobject(mmu);
 		if (!mmu->defaultpagetable) {
@@ -380,7 +395,12 @@ int kgsl_mmu_init(struct kgsl_device *device)
 			return -ENOMEM;
 		}
 		mmu->hwpagetable = mmu->defaultpagetable;
-		status = kgsl_yamato_setpagetable(device);
+		kgsl_yamato_regwrite(device, REG_MH_MMU_PT_BASE,
+					mmu->hwpagetable->base.gpuaddr);
+		kgsl_yamato_regwrite(device, REG_MH_MMU_VA_RANGE,
+				(mmu->hwpagetable->va_base |
+				(mmu->hwpagetable->va_range >> 16)));
+		status = kgsl_yamato_setstate(device, KGSL_MMUFLAGS_TLBFLUSH);
 		if (status) {
 			kgsl_mmu_close(device);
 			return status;
@@ -474,7 +494,7 @@ int kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 
 	*gpuaddr = gen_pool_alloc(pagetable->pool, alloc_size);
 	if (*gpuaddr == 0) {
-		KGSL_MEM_ERR("gen_pool_alloc failed\n");
+		KGSL_MEM_ERR("gen_pool_alloc failed: %d\n", alloc_size);
 		return -ENOMEM;
 	}
 
@@ -554,7 +574,7 @@ int kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 	/* Invalidate tlb only if current page table used by GPU is the
 	 * pagetable that we used to allocate */
 	if (pagetable == mmu->hwpagetable)
-		kgsl_yamato_tlbinvalidate(mmu->device);
+		kgsl_yamato_setstate(mmu->device, KGSL_MMUFLAGS_TLBFLUSH);
 
 
 	KGSL_MEM_VDBG("return %d\n", 0);
@@ -573,8 +593,6 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 			pagetable, gpuaddr, range);
 
 	BUG_ON(range <= 0);
-
-	gen_pool_free(pagetable->pool, gpuaddr, range);
 
 	numpages = (range >> KGSL_PAGESIZE_SHIFT);
 	if (range & (KGSL_PAGESIZE - 1))
@@ -599,7 +617,10 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable, unsigned int gpuaddr,
 	/* Invalidate tlb only if current page table used by GPU is the
 	 * pagetable that we used to allocate */
 	if (pagetable == pagetable->mmu->hwpagetable)
-		kgsl_yamato_tlbinvalidate(pagetable->mmu->device);
+		kgsl_yamato_setstate(pagetable->mmu->device,
+					KGSL_MMUFLAGS_TLBFLUSH);
+
+	gen_pool_free(pagetable->pool, gpuaddr, range);
 
 	KGSL_MEM_VDBG("return %d\n", 0);
 
@@ -635,9 +656,7 @@ int kgsl_mmu_close(struct kgsl_device *device)
 		mmu->flags &= ~KGSL_FLAGS_STARTED;
 		mmu->flags &= ~KGSL_FLAGS_INITIALIZED;
 		mmu->flags &= ~KGSL_FLAGS_INITIALIZED0;
-#ifndef PER_PROCESS_PAGE_TABLE
 		kgsl_mmu_destroypagetableobject(mmu->defaultpagetable);
-#endif
 		mmu->defaultpagetable = NULL;
 	}
 

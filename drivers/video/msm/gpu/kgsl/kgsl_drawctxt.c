@@ -26,6 +26,7 @@
 #include "kgsl.h"
 #include "kgsl_log.h"
 #include "kgsl_pm4types.h"
+#include "kgsl_cmdstream.h"
 
 /*
 *
@@ -1649,8 +1650,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 		if (active_ctxt->flags & CTXT_FLAGS_SHADER_SAVE) {
 			/* save shader partitioning and instructions. */
 			KGSL_CTXT_DBG("save shader");
-			kgsl_ringbuffer_issuecmds(device, 1,
-					active_ctxt->shader_save, 3);
+			kgsl_ringbuffer_issuecmds(device, KGSL_CMD_FLAGS_PMODE,
+						  active_ctxt->shader_save, 3);
 
 			/* fixup shader partitioning parameter for
 			 *  SET_SHADER_BASES.
@@ -1672,7 +1673,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 			for (i = 0; i < KGSL_MAX_GMEM_SHADOW_BUFFERS; i++) {
 				if (active_ctxt->user_gmem_shadow[i].gmemshadow.
 				    size > 0) {
-					kgsl_ringbuffer_issuecmds(device, 1,
+					kgsl_ringbuffer_issuecmds(device,
+						KGSL_CMD_FLAGS_PMODE,
 					  active_ctxt->user_gmem_shadow[i].
 						gmem_save, 3);
 
@@ -1684,9 +1686,10 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 				}
 			}
 			if (numbuffers == 0) {
-				kgsl_ringbuffer_issuecmds(device, 1,
-					 active_ctxt->context_gmem_shadow.
-						gmem_save, 3);
+				kgsl_ringbuffer_issuecmds(device,
+				    KGSL_CMD_FLAGS_PMODE,
+				    active_ctxt->context_gmem_shadow.gmem_save,
+				    3);
 
 				/* Restore TP0_CHICKEN */
 				kgsl_ringbuffer_issuecmds(device, 0,
@@ -1704,7 +1707,7 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 
 		KGSL_CTXT_INFO("drawctxt flags %08x\n", drawctxt->flags);
 		KGSL_CTXT_DBG("restore pagetable");
-		kgsl_mmu_setpagetable(device, drawctxt->pagetable);
+		kgsl_mmu_setstate(device, drawctxt->pagetable);
 
 		/* restore gmem.
 		 *  (note: changes shader. shader must not already be restored.)
@@ -1716,7 +1719,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 			for (i = 0; i < KGSL_MAX_GMEM_SHADOW_BUFFERS; i++) {
 				if (drawctxt->user_gmem_shadow[i].gmemshadow.
 				    size > 0) {
-					kgsl_ringbuffer_issuecmds(device, 1,
+					kgsl_ringbuffer_issuecmds(device,
+						KGSL_CMD_FLAGS_PMODE,
 					  drawctxt->user_gmem_shadow[i].
 						gmem_restore, 3);
 
@@ -1727,7 +1731,8 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 				}
 			}
 			if (numbuffers == 0) {
-				kgsl_ringbuffer_issuecmds(device, 1,
+				kgsl_ringbuffer_issuecmds(device,
+					KGSL_CMD_FLAGS_PMODE,
 				  drawctxt->context_gmem_shadow.gmem_restore,
 					3);
 
@@ -1746,13 +1751,14 @@ kgsl_drawctxt_switch(struct kgsl_device *device, struct kgsl_drawctxt *drawctxt,
 		/* restore shader instructions & partitioning. */
 		if (drawctxt->flags & CTXT_FLAGS_SHADER_RESTORE)
 			KGSL_CTXT_DBG("restore shader");
-			kgsl_ringbuffer_issuecmds(device, 0,
+		kgsl_ringbuffer_issuecmds(device, 0,
 					  drawctxt->shader_restore, 3);
 
 		cmds[0] = pm4_type3_packet(PM4_SET_BIN_BASE_OFFSET, 1);
 		cmds[1] = drawctxt->bin_base_offset;
 		kgsl_ringbuffer_issuecmds(device, 0, cmds, 2);
 
-	}
+	} else
+		kgsl_mmu_setstate(device, device->mmu.defaultpagetable);
 	KGSL_CTXT_INFO("return\n");
 }

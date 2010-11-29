@@ -491,7 +491,7 @@ int android_switch_function(unsigned func)
 	return 0;
 }
 
-void android_enable_function(struct usb_function *f, int enable)
+void android_enable_function(struct usb_function *f, int enable, bool reset)
 {
 	struct android_dev *dev = _android_dev;
 	int disable = !enable;
@@ -517,7 +517,8 @@ void android_enable_function(struct usb_function *f, int enable)
 #endif
 
 #ifdef CONFIG_USB_GADGET_MSM_72K
-	msm_hsusb_request_reset();
+	if (reset)
+		msm_hsusb_request_reset();
 #else
 		/* force reenumeration */
 		if (dev->cdev && dev->cdev->gadget &&

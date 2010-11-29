@@ -34,6 +34,10 @@
 
 #include <asm/atomic.h>
 
+#if defined(CONFIG_ARCH_MSM7X30)
+#include <mach/internal_power_rail.h>
+#endif
+
 #include "kgsl.h"
 #include "kgsl_drawctxt.h"
 #include "kgsl_ringbuffer.h"
@@ -49,6 +53,21 @@ struct kgsl_file_private {
 };
 
 static void kgsl_put_phys_file(struct file *file);
+
+#if defined(CONFIG_ARCH_MSM7X30)
+static void kgsl_power(bool on)
+{
+	if (on) {
+		internal_pwr_rail_mode(PWR_RAIL_GRP_CLK,
+				PWR_RAIL_CTL_MANUAL);
+		internal_pwr_rail_ctl(PWR_RAIL_GRP_CLK, 1);
+	} else {
+		internal_pwr_rail_ctl(PWR_RAIL_GRP_CLK, 0);
+		internal_pwr_rail_mode(PWR_RAIL_GRP_CLK,
+					PWR_RAIL_CTL_AUTO);
+	}
+}
+#endif
 
 #ifdef CONFIG_MSM_KGSL_MMU
 static long flush_l1_cache_range(unsigned long addr, int size)
@@ -120,14 +139,14 @@ static void kgsl_clk_enable(void)
 	if (kgsl_driver.grp_pclk)
 		clk_enable(kgsl_driver.grp_pclk);
 	clk_enable(kgsl_driver.grp_clk);
-#ifdef CONFIG_ARCH_MSM7227
+#if defined (CONFIG_ARCH_MSM7227) || defined (CONFIG_ARCH_MSM7X30)
 	clk_enable(kgsl_driver.grp_pclk);
 #endif
 }
 
 static void kgsl_clk_disable(void)
 {
-#ifdef CONFIG_ARCH_MSM7227
+#if defined (CONFIG_ARCH_MSM7227) || defined (CONFIG_ARCH_MSM7X30)
 	clk_disable(kgsl_driver.grp_pclk);
 #endif
 	clk_disable(kgsl_driver.grp_clk);
@@ -195,6 +214,12 @@ static int kgsl_first_open_locked(void)
 
 	kgsl_clk_enable();
 
+#if defined(CONFIG_ARCH_MSM7X30)
+	/* 7x30 has HW bug and needs clocks turned on before the power
+	 * rails
+	 */
+	kgsl_power(1);
+#endif
 	/* init memory apertures */
 	result = kgsl_sharedmem_init(&kgsl_driver.shmem);
 	if (result != 0)
@@ -229,6 +254,10 @@ static int kgsl_last_release_locked(void)
 	/* shutdown memory apertures */
 	kgsl_sharedmem_close(&kgsl_driver.shmem);
 
+#if defined(CONFIG_ARCH_MSM7X30)
+	kgsl_power(0);
+#endif
+
 	kgsl_clk_disable();
 	kgsl_driver.active = false;
 	wake_unlock(&kgsl_driver.wake_lock);
@@ -260,7 +289,7 @@ static int kgsl_release(struct inode *inodep, struct file *filep)
 		kgsl_remove_mem_entry(entry);
 
 	if (private->pagetable != NULL) {
-#ifdef PER_PROCESS_PAGE_TABLE
+#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
 		kgsl_yamato_cleanup_pt(&kgsl_driver.yamato_device,
 					private->pagetable);
 		kgsl_mmu_destroypagetableobject(private->pagetable);
@@ -288,6 +317,7 @@ static int kgsl_open(struct inode *inodep, struct file *filep)
 	struct kgsl_file_private *private = NULL;
 
 	KGSL_DRV_DBG("file %p pid %d\n", filep, task_pid_nr(current));
+
 
 	if (filep->f_flags & O_EXCL) {
 		KGSL_DRV_ERR("O_EXCL not allowed\n");
@@ -318,14 +348,15 @@ static int kgsl_open(struct inode *inodep, struct file *filep)
 	kgsl_hw_get_locked();
 
 	/*NOTE: this must happen after first_open */
-#ifdef PER_PROCESS_PAGE_TABLE
+#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
 	private->pagetable =
 		kgsl_mmu_createpagetableobject(&kgsl_driver.yamato_device.mmu);
 	if (private->pagetable == NULL) {
 		result = -ENOMEM;
 		goto done;
 	}
-	result = kgsl_yamato_setup_pt(device, private->pagetable);
+	result = kgsl_yamato_setup_pt(&kgsl_driver.yamato_device,
+					private->pagetable);
 	if (result) {
 		kgsl_mmu_destroypagetableobject(private->pagetable);
 		private->pagetable = NULL;
@@ -437,14 +468,12 @@ static long kgsl_ioctl_device_waittimestamp(struct kgsl_file_private *private,
 		goto done;
 	}
 
-	mutex_unlock(&kgsl_driver.mutex);
 	/* Don't wait forever, set a max value for now */
 	if (param.timeout == -1)
 		param.timeout = 10 * MSEC_PER_SEC;
 	result = kgsl_yamato_waittimestamp(&kgsl_driver.yamato_device,
 				     param.timestamp,
 				     param.timeout);
-	mutex_lock(&kgsl_driver.mutex);
 
 	kgsl_yamato_runpending(&kgsl_driver.yamato_device);
 done:
@@ -1153,7 +1182,7 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 	BUG_ON(kgsl_driver.grp_clk != NULL);
 	BUG_ON(kgsl_driver.imem_clk != NULL);
 	BUG_ON(kgsl_driver.ebi1_clk != NULL);
-#ifdef CONFIG_ARCH_MSM7227
+#if defined (CONFIG_ARCH_MSM7227) || defined (CONFIG_ARCH_MSM7X30)
 	BUG_ON(kgsl_driver.grp_pclk != NULL);
 #endif
 
@@ -1193,7 +1222,7 @@ static int __devinit kgsl_platform_probe(struct platform_device *pdev)
 	}
 	kgsl_driver.ebi1_clk = clk;
 
-#ifdef CONFIG_ARCH_MSM7227
+#if defined (CONFIG_ARCH_MSM7227) || defined (CONFIG_ARCH_MSM7X30)
 	clk = clk_get(&pdev->dev, "grp_pclk");
 	if (IS_ERR(clk)) {
 		result = PTR_ERR(clk);

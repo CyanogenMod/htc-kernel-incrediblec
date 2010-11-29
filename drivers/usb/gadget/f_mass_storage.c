@@ -235,7 +235,6 @@ struct lun {
 	unsigned int	registered : 1;
 	unsigned int	info_valid : 1;
 	unsigned int	cdrom : 1;
-	unsigned int	cdrom_enable : 1;
 
 	u32		sense_data;
 	u32		sense_data_info;
@@ -2786,7 +2785,6 @@ static ssize_t store_file(struct device *dev, struct device_attribute *attr,
 	struct lun	*curlun = dev_to_lun(dev);
 	struct fsg_dev	*fsg = dev_get_drvdata(dev);
 	int		rc = 0;
-	int load_medium = 0;
 
 	printk(KERN_INFO "store_file: \"%s\"\n", buf);
 #if 0
@@ -2814,19 +2812,6 @@ static ssize_t store_file(struct device *dev, struct device_attribute *attr,
 		if (rc == 0)
 			curlun->unit_attention_data =
 					SS_NOT_READY_TO_READY_TRANSITION;
-		load_medium = 1;
-	}
-	if (curlun->cdrom && curlun->cdrom_enable != load_medium) {
-		android_usb_set_connected(0);
-		curlun->cdrom_enable = load_medium;
-		/* NOTE: Only support one cdrom disk and
-		 * it is located in last lun */
-		if (load_medium)
-			fsg->nluns++;
-		else
-			fsg->nluns--;
-		mdelay(10);
-		android_usb_set_connected(1);
 	}
 	up_write(&fsg->filesem);
 	return (rc < 0 ? rc : count);
@@ -2930,7 +2915,6 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 	struct lun		*curlun;
 	struct usb_ep		*ep;
 	char			*pathbuf, *p;
-	int num_cdrom = 0;
 
 	fsg->cdev = cdev;
 	DBG(fsg, "fsg_function_bind\n");
@@ -2962,7 +2946,6 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 		if (fsg->cdrom_lun & (1 << i)) {
 			curlun->cdrom = 1;
 			curlun->ro = 1;
-			num_cdrom++;
 		}
 		curlun->dev.release = lun_release;
 		/* use "usb_mass_storage" platform device as parent if available */
@@ -2987,7 +2970,6 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 		curlun->registered = 1;
 		kref_get(&fsg->ref);
 	}
-	fsg->nluns -= num_cdrom;
 
 	/* allocate interface ID(s) */
 	id = usb_interface_id(c, f);

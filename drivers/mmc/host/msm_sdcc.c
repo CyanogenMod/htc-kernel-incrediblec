@@ -1040,7 +1040,7 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	host->stats.reqs++;
 
-	if (host->eject) {
+	if (host->eject || (mmc->card && mmc->card->removed)) {
 		if (mrq->data && !(mrq->data->flags & MMC_DATA_READ)) {
 			mrq->cmd->error = 0;
 			mrq->data->bytes_xfered = mrq->data->blksz *

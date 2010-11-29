@@ -25,6 +25,7 @@ obj-$(CONFIG_AMP_TPA6130A)	+= tpa6130.o
 obj-$(CONFIG_AMP_TPA2018D1)	+= tpa2018d1.o
 obj-$(CONFIG_ARCH_MSM_FLASHLIGHT)	+= adp1650_flashlight.o
 obj-$(CONFIG_INPUT_ISL29028)	+= isl29028.o
+obj-$(CONFIG_SMB329)            += smb329.o
 obj-$(CONFIG_TPS65200)          += tps65200.o
 
 ifeq ($(CONFIG_I2C_DEBUG_CHIP),y)

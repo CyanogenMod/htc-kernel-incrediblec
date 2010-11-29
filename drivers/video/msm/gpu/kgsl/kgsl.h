@@ -34,6 +34,7 @@
 #include "kgsl_sharedmem.h"
 
 #define DRIVER_NAME "kgsl"
+#define CHIP_REV_251 0x020501
 
 struct kgsl_driver {
 	struct miscdevice misc;
@@ -48,7 +49,7 @@ struct kgsl_driver {
 	struct clk *grp_pclk;
 	struct clk *imem_clk;
 	struct clk *ebi1_clk;
-#ifdef CONFIG_ARCH_MSM7227
+#if defined (CONFIG_ARCH_MSM7227) || defined (CONFIG_ARCH_MSM7X30)
 	struct clk *grp_pclk;
 #endif
 	struct kgsl_devconfig yamato_config;

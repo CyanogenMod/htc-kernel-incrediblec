@@ -5850,9 +5850,9 @@ get_channel_retry:
 	res |= dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
 #endif
 #ifdef AP_ONLY
+		ap_mode = 1;
 		res |= wl_iw_set_ap_security(dev, &my_ap);
 		wl_iw_send_priv_event(dev, "ASCII_CMD=AP_BSS_START");
-		ap_mode = 1;
 
 #else
 	if (res != 0) {
@@ -6305,6 +6305,7 @@ static int iwpriv_softap_stop(struct net_device *dev,
 #ifdef AP_ONLY
 	res = wl_iw_softap_deassoc_stations(dev);
 	ap_mode = 0;
+	wl_iw_send_priv_event(priv_dev, "AP_DOWN");
 #else
 	res = wl_iw_softap_deassoc_stations(ap_net_dev);
 

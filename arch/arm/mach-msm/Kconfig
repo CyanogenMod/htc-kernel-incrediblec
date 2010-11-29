@@ -362,63 +362,6 @@ config MACH_LIBERTY
 	help
 	  Support for Liberty (PDA phone).
 
-config MACH_VISION
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       default n
-       bool "MSM7x30 VISION"
-       help
-         Support for the Qualcomm MSM7x30 Vision board.
-
-config MACH_LEXIKON
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       default n
-       bool "MSM7x30 LEXIKON"
-       help
-         Support for the Qualcomm MSM7x30 Lexikon board.
-
-config MACH_SPEEDY
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       default n
-       bool "MSM7x30 SPEEDY"
-       help
-         Support for the Qualcomm MSM7x30 Speedy board.
-
-config MACH_MECHA
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       default n
-       bool "MSM7x30 MECHA"
-       help
-         Support for the Qualcomm MSM7x30 Mecha board.
-
-config MACH_BLITZC
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       depends on MACH_MECHA
-       default n
-       bool "MSM7x30 BLITZC"
-       help
-         Support for the Qualcomm MSM7x30 Blitz#C board.
-
-config MACH_GLACIER
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       default n
-       bool "MSM7x30 GLACIER"
-       help
-         Support for the Qualcomm MSM7x30 Glacier board.
-
-config MACH_SPADE
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       default n
-       bool "MSM7x30 SPADE"
-       help
-         Support for the Qualcomm MSM7x30 Spade board.
-
 config TROUT_BATTCHG
 	depends on MACH_TROUT && POWER_SUPPLY
 	default n

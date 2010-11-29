@@ -31,4 +31,6 @@ extern unsigned int mmc_queue_map_sg(struct mmc_queue *);
 extern void mmc_queue_bounce_pre(struct mmc_queue *);
 extern void mmc_queue_bounce_post(struct mmc_queue *);
 
+extern int mmc_schedule_delayed_work(struct delayed_work *work,
+				     unsigned long delay);
 #endif

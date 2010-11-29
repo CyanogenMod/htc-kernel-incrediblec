@@ -35,7 +35,7 @@
 struct device diag_device;
 
 #if 1
-#define TRACE(tag,data,len,decode) do {} while(0)
+#define TRACE(tag, data, len, decode) do {} while (0)
 #else
 static void TRACE(const char *tag, const void *_data, int len, int decode)
 {
@@ -82,8 +82,7 @@ static void TRACE(const char *tag, const void *_data, int len, int decode)
 #define TX_REQ_NUM 4
 #define RX_REQ_NUM 4
 
-struct diag_context
-{
+struct diag_context {
 	struct usb_function function;
 	struct usb_composite_dev *cdev;
 	struct usb_ep *out;
@@ -344,7 +343,7 @@ static long diag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (copy_from_user(&tmp_value, argp, sizeof(int)))
 			return -EFAULT;
 		printk(KERN_INFO "diag: enable %d\n", tmp_value);
-		android_enable_function(&_context.function, tmp_value);
+		android_enable_function(&_context.function, tmp_value, true);
 		smd_diag_enable("diag_ioctl", tmp_value);
 		/* force diag_read to return error when disable diag */
 		if (tmp_value == 0)
@@ -758,7 +757,7 @@ static void diag_process_hdlc(struct diag_context *ctxt, void *_data, unsigned l
 
 	while (len-- > 0) {
 		unsigned char x = *data++;
-		if (x == 0x7E) { 
+		if (x == 0x7E) {
 			if (count > 2) {
 				/* we're just ignoring the crc here */
 				TRACE("PC>", hdlc, count - 2, 0);
@@ -910,7 +909,6 @@ again:
 			ctxt->rx_count += r;
 
 			if (!ctxt->online) {
-//				printk("$$$ discard %d\n", r);
 				req_put(ctxt, &ctxt->tx_req_idle, req);
 				goto again;
 			}
@@ -1234,7 +1232,7 @@ static int diag_set_enabled(const char *val, struct kernel_param *kp)
 {
 	int enabled = simple_strtol(val, NULL, 0);
 	if (_context.cdev)
-		android_enable_function(&_context.function, enabled);
+		android_enable_function(&_context.function, enabled, true);
 	_context.function_enable = !!enabled;
 	smd_diag_enable("diag_set_enabled", enabled);
 	return 0;

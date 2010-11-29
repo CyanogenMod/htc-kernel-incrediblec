@@ -88,7 +88,7 @@ static ssize_t enable_store(
 
 	sscanf(buf, "%d", &value);
 	if (driver->enable_function)
-		driver->enable_function(f, value);
+		driver->enable_function(f, value, true);
 	else
 		f->hidden = !value;
 

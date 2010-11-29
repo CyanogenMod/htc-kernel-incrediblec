@@ -510,7 +510,7 @@ static int adb_enable_open(struct inode *ip, struct file *fp)
 	}
 
 	printk(KERN_INFO "enabling adb\n");
-	android_enable_function(&_adb_dev->function, 1);
+	android_enable_function(&_adb_dev->function, 1, true);
 
 	return 0;
 }
@@ -518,7 +518,7 @@ static int adb_enable_open(struct inode *ip, struct file *fp)
 static int adb_enable_release(struct inode *ip, struct file *fp)
 {
 	printk(KERN_INFO "disabling adb\n");
-	android_enable_function(&_adb_dev->function, 0);
+	android_enable_function(&_adb_dev->function, 0, true);
 	atomic_dec(&adb_enable_excl);
 	return 0;
 }

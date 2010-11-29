@@ -89,7 +89,7 @@ extern void android_usb_set_connected(int on);
 
 extern void android_register_function(struct android_usb_function *f);
 
-extern void android_enable_function(struct usb_function *f, int enable);
+extern void android_enable_function(struct usb_function *f, int enable, bool reset);
 
 extern int android_get_model_id(void);
 

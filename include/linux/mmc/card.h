@@ -119,6 +119,7 @@ struct mmc_card {
 	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
 
 	struct dentry		*debugfs_root;
+	unsigned int		removed;
 };
 
 #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)

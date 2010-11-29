@@ -44,6 +44,15 @@ config SENSORS_AKM8975
         help
          AKM8975 Compass Driver implemented by HTC.
 
+config SMB329
+	tristate "smb329 Driver"
+	depends on I2C
+	help
+	 SMB329 Switch charger implemented by HTC.
+	 This could enable battery driver to set
+	 Charging current 100mA~500mA or 500mA~1000mA
+	 by GPIO or Register
+
 config TPS65200
         tristate "tps65200 Driver"
         depends on I2C
