@@ -356,7 +356,7 @@ static struct usb_mass_storage_platform_data mass_storage_pdata = {
 	.vendor		= "HTC",
 	.product	= "Android Phone",
 	.release	= 0x0100,
-	.cdrom_lun	= 4,
+/*	.cdrom_lun	= 4,*/
 };
 
 static struct platform_device usb_mass_storage_device = {
