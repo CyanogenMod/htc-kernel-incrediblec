@@ -15,7 +15,6 @@
  *
  */
 
-#include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/i2c-msm.h>
@@ -356,7 +355,7 @@ static struct usb_mass_storage_platform_data mass_storage_pdata = {
 	.vendor		= "HTC",
 	.product	= "Android Phone",
 	.release	= 0x0100,
-	.cdrom_lun	= 4,
+/*	.cdrom_lun	= 4,*/
 };
 
 static struct platform_device usb_mass_storage_device = {
@@ -719,8 +718,8 @@ static struct regulator_init_data tps65023_data[5] = {
 	{
 		.constraints = {
 			.name = "dcdc1", /* VREG_MSMC2_1V29 */
-			.min_uV = 950000,
-			.max_uV = 1300000,
+			.min_uV = 925000,
+			.max_uV = 1350000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
 		},
 		.consumer_supplies = tps65023_dcdc1_supplies,
