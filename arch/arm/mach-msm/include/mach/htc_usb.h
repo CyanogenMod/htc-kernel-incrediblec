@@ -32,7 +32,7 @@ static char *usb_functions_adb[] = {
 
 #ifdef CONFIG_USB_ANDROID_RNDIS
 static char *usb_functions_rndis[] = {
-	"ether",
+	"rndis",
 };
 #endif
 
@@ -110,7 +110,7 @@ static char *usb_functions_diag_serial[] = {
 
 static char *usb_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_RNDIS
-	"ether",
+	"rndis",
 #endif
 #ifdef CONFIG_USB_ANDROID_MTP
 	"mtp",
