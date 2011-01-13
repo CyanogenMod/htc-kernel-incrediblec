@@ -125,10 +125,12 @@ static void __init acpuclk_init_cpufreq_table(void)
 		freq_table[i].index = i;
 		freq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 
-		/* Skip speeds using the global pll */
-		if (acpu_freq_tbl[i].acpu_khz == 256000 ||
-				acpu_freq_tbl[i].acpu_khz == 19200)
-			continue;
+                /* Define speeds that we want to skip */
+                if (/* acpu_freq_tbl[i].acpu_khz == 256000 || */
+                                acpu_freq_tbl[i].acpu_khz == 19200 ||
+                                acpu_freq_tbl[i].acpu_khz == 128000 ||
+                                acpu_freq_tbl[i].acpu_khz == 256000)
+                        continue;
 
 		vdd = acpu_freq_tbl[i].vdd;
 		/* Allow mpll and the first scpll speeds */
@@ -139,7 +141,7 @@ static void __init acpuclk_init_cpufreq_table(void)
 		}
 
 		/* Take the fastest speed available at the specified VDD level */
-		if (vdd != acpu_freq_tbl[i + 1].vdd)
+		//if (vdd != acpu_freq_tbl[i + 1].vdd)
 			freq_table[i].frequency = acpu_freq_tbl[i].acpu_khz;
 	}
 
