@@ -2956,7 +2956,7 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 	if (i < 0)
 		return i;
 	fsg_intf_desc.bInterfaceNumber = i;
-	fsg->interface_number = i;
+	fsg->interface_number = 0;
 
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	/* HACK!!  Android doesn't rebind on new configurations, instead it
